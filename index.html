@@ -24,11 +24,77 @@
         </style>
     </head>
     <body>
-        <a href="https://github.com/tcoupin/leaflet-paintpolygon"><img style="position: absolute; top: 0; right: 0; border: 0;z-index: 10000;" src="https://s3.amazonaws.com/github/ribbons/forkme_right_orange_ff7600.png" alt="Fork me on GitHub"></a>
+        <input id="search" type="text" placeholder="введите адресс">
         <div id="mapid"></div>
         <script>
 
-        var map = L.map('mapid').setView([43.605413, 3.879568], 10);
+            const limitSquare = [
+                {
+                    y: 43.257205668363206,
+                    x: 77.0419692993164
+                },
+                {
+                    y: 43.197167282501276,
+                    x: 76.89402923583984,
+                },
+            ];
+
+            const viewbox = limitSquare.map(cord => `${cord.x},${cord.y}`).join(',');
+
+            const zoneData = localStorage.getItem('zone');
+
+            const searchInput = document.getElementById('search');
+
+            searchInput.onkeydown = (e) => {
+                if(e.key === 'Enter') {
+                    find(e.target.value);
+                }
+            }
+
+            function find(address) {
+                const city = 'Алматы ';
+                const searchParam = `${city}${address}`
+                const API = 'https://nominatim.openstreetmap.org/search?';
+
+                const params = {
+                    format: 'json',
+                    viewbox,
+                    q: searchParam,
+                    bounded:1
+                };
+                const url = API + new URLSearchParams(params).toString();
+                fetch(url)
+                    .then(response => response.json())
+                    .then(data => {
+                        data.forEach(point => {
+                            L.marker([Number(point.lat), Number(point.lon)]).addTo(map);
+                        })
+                        console.log(data);
+                    })
+            }
+
+            const pointInPolygon = function (polygon, point) {
+                //A point is in a polygon if a line from the point to infinity crosses the polygon an odd number of times
+                let odd = false;
+                //For each edge (In this case for each point of the polygon and the previous one)
+                for (let i = 0, j = polygon.length - 1; i < polygon.length; i++) {
+                    //If a line from the point into infinity crosses this edge
+                    if (((polygon[i][1] > point[1]) !== (polygon[j][1] > point[1])) // One point needs to be above, one below our y coordinate
+                        // ...and the edge doesn't cross our Y corrdinate before our x coordinate (but between our x coordinate and infinity)
+                        && (point[0] < ((polygon[j][0] - polygon[i][0]) * (point[1] - polygon[i][1]) / (polygon[j][1] - polygon[i][1]) + polygon[i][0]))) {
+                        // Invert odd
+                        odd = !odd;
+                    }
+                    j = i;
+
+                }
+                //If the number of crossings was odd, the point is in the polygon
+                return odd;
+            };
+
+
+
+        var map = L.map('mapid').setView([43.238949, 76.889709], 12);
 
         L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png', {
             attribution: 'Map tiles by <a href="http://stamen.com">Stamen Design</a>, <a href="http://creativecommons.org/licenses/by/3.0">CC BY 3.0</a> &mdash; Map data &copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>',
@@ -37,28 +103,66 @@
             maxZoom: 20,
             ext: 'png'
         }).addTo(map);
-        
-        var paintpolygonControl = L.control.paintPolygon({position: 'topleft'}).addTo(map);
 
-        //INTRO
-        intro = introJs();
-        intro.setOptions({
-            steps: [
-                {
-                    element: ".leaflet-control-paintpolygon-icon-brush",
-                    intro: "Start drawing your polygon"
-                },
-                {
-                    element: ".leaflet-control-paintpolygon-icon-eraser",
-                    intro: "Erase"
-                },
-                {
-                    element: ".leaflet-control-paintpolygon-icon-size",
-                    intro: "Change circle size"
-                }
-            ]
-        });
-        intro.start();
+            var bounds = [[limitSquare[0].y, limitSquare[0].x], [limitSquare[1].y, limitSquare[1].x]];
+           // var bounds = [[54.559322, -5.767822], [56.1210604, -3.021240]];
+            // create an orange rectangle
+            L.rectangle(bounds, {color: "#ff7800", weight: 1}).addTo(map);
+
+            // zoom the map to the rectangle bounds
+           // map.fitBounds(bounds);
+
+
+
+        const testPoint = [43.226193219295475, 76.97982788085938];
+
+        L.marker(testPoint).addTo(map);
+
+        const instanceOfDraw =  L.control.paintPolygon({position: 'topleft'});
+
+        console.log(instanceOfDraw)
+
+        var paintpolygonControl = instanceOfDraw.addTo(map);
+
+
+        const parsedZoneData = JSON.parse(zoneData);
+
+
+            const coords = parsedZoneData.coordinates.flat(2).map(cord => [cord[1], cord[0]]);
+            // coords.forEach(cd => {
+            //     L.marker([cd[1], cd[0]]).addTo(map);
+            // })
+
+            console.log(pointInPolygon(coords, testPoint));
+
+            map.on('click', function({latlng: {lat, lng}, layerPoint}){
+                L.marker([lat, lng]).addTo(map);
+                console.log({lat, lng}, layerPoint)
+            });
+
+            const addressToFind = 'гоголя 142';
+
+            fetch("https://nominatim.openstreetmap.org/search?format=json&limit=3&q=" + addressToFind)
+                .then(response => response.json())
+                .then(data => {
+                    console.log(data);
+                })
+
+            console.log('kek', coords)
+
+        // parsedZoneData.coordinates.forEach(cord => {
+        //     // //L.marker(cord).addTo(map);
+        //     // console.log(cord[0]);
+        //     cord[0].forEach(cd => {
+        //         L.marker([cd[1], cd[0]]).addTo(map);
+        //     })
+        // });
+
+           // pointInPolygon()
+
+            setTimeout(() => {
+                instanceOfDraw.setData(JSON.parse(zoneData));
+            });
         
         </script>
     </body>
